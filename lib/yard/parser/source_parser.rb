@@ -1,6 +1,5 @@
 # frozen_string_literal: true
 require 'stringio'
-require 'ostruct'
 
 module YARD
   module Parser
@@ -108,7 +107,8 @@ module YARD
           files = [paths].flatten.
             map {|p| File.directory?(p) ? "#{p}/**/*.{rb,c,cc,cxx,cpp}" : p }.
             map {|p| p.include?("*") ? Dir[p].sort_by {|d| [d.length, d] } : p }.flatten.
-            reject {|p| !File.file?(p) || excluded.any? {|re| p =~ re } }
+            reject {|p| !File.file?(p) || excluded.any? {|re| p =~ re } }.
+            map {|p| p.encoding == Encoding.default_external ? p : p.dup.force_encoding(Encoding.default_external) }
 
           log.enter_level(level) do
             parse_in_order(*files.uniq)
@@ -476,9 +476,8 @@ module YARD
           content.force_encoding('binary')
           ENCODING_BYTE_ORDER_MARKS.each do |encoding, bom|
             bom.force_encoding('binary')
-            if content[0, bom.size] == bom
-              content.force_encoding(encoding)
-              return content
+            if content.start_with?(bom)
+              return content.sub(bom, '').force_encoding(encoding)
             end
           end
           content.force_encoding('utf-8') # UTF-8 is default encoding
